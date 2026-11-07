@@ -71,12 +71,15 @@ jobs:
     steps:
     - name: Setup
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Setup
       id: ghd
       uses: proudust/gh-describe@v2
 
-    - name: Setup
+    - name: Setup MSVC
+      if: runner.os == 'Windows'
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Install Dependencies
