@@ -998,13 +998,25 @@ void NetUpdate (void)
 	// build new ticcmds for console player
 	for (i = 0; i < newtics; i++)
 	{
-		I_StartTic ();
-		D_ProcessEvents ();
+		if (!Args->CheckParm("-dedicated"))
+		{
+			I_StartTic ();
+			D_ProcessEvents ();
+		}
 		if (pauseext || (maketic - gametic) / ticdup >= BACKUPTICS/2-1)
 			break;			// can't hold any more
 		
-		//Printf ("mk:%i ",maketic);
-		G_BuildTiccmd (&localcmds[maketic % LOCALCMDTICS]);
+		// Slot 0 belongs to the dedicated host, but has no human input.
+		if (Args->CheckParm("-dedicated"))
+		{
+			auto &cmd = localcmds[maketic % LOCALCMDTICS];
+			memset(&cmd, 0, sizeof(cmd));
+			cmd.consistancy = consistancy[consoleplayer][(maketic / ticdup) % BACKUPTICS];
+		}
+		else
+		{
+			G_BuildTiccmd (&localcmds[maketic % LOCALCMDTICS]);
+		}
 		maketic++;
 
 		if (ticdup == 1 || maketic == 0)
@@ -1697,6 +1709,12 @@ bool D_CheckNetGame (void)
 		resendto[i] = 0;				// which tic to start sending
 	}
 
+	const bool dedicated = Args->CheckParm("-dedicated") != 0;
+	if (dedicated && !Args->CheckParm("-host"))
+	{
+		I_FatalError("-dedicated requires -host <numplayers>.");
+	}
+
 	// Packet server has proven to be rather slow over the internet. Print a warning about it.
 	v = Args->CheckValue("-netmode");
 	if (v != NULL && (atoi(v) != 0))
@@ -1726,10 +1744,18 @@ bool D_CheckNetGame (void)
 
 	if (consoleplayer == Net_Arbitrator)
 	{
-		v = Args->CheckValue("-netmode");
-		if (v != NULL)
+		if (dedicated)
 		{
-			NetMode = atoi(v) != 0 ? NET_PacketServer : NET_PeerToPeer;
+			// Dedicated hosts always arbitrate packets for connected clients.
+			NetMode = NET_PacketServer;
+		}
+		else
+		{
+			v = Args->CheckValue("-netmode");
+			if (v != NULL)
+			{
+				NetMode = atoi(v) != 0 ? NET_PacketServer : NET_PeerToPeer;
+			}
 		}
 		if (doomcom.numnodes > 1)
 		{
@@ -1950,8 +1976,11 @@ void TryRunTics (void)
 			C_Ticker();
 			M_Ticker();
 			// Repredict the player for new buffered movement
-			P_UnPredictPlayer();
-			P_PredictPlayer(&players[consoleplayer]);
+			if (!Args->CheckParm("-dedicated"))
+			{
+				P_UnPredictPlayer();
+				P_PredictPlayer(&players[consoleplayer]);
+			}
 		}
 		return;
 	}
@@ -1992,8 +2021,11 @@ void TryRunTics (void)
 			C_Ticker ();
 			M_Ticker ();
 			// Repredict the player for new buffered movement
-			P_UnPredictPlayer();
-			P_PredictPlayer(&players[consoleplayer]);
+			if (!Args->CheckParm("-dedicated"))
+			{
+				P_UnPredictPlayer();
+				P_PredictPlayer(&players[consoleplayer]);
+			}
 			return;
 		}
 	}
@@ -2007,7 +2039,7 @@ void TryRunTics (void)
 	// run the count tics
 	if (counts > 0)
 	{
-		P_UnPredictPlayer();
+		if (!Args->CheckParm("-dedicated")) P_UnPredictPlayer();
 		while (counts--)
 		{
 			TicStabilityBegin();
@@ -2028,8 +2060,11 @@ void TryRunTics (void)
 			NetUpdate ();	// check for new console commands
 			TicStabilityEnd();
 		}
-		P_PredictPlayer(&players[consoleplayer]);
-		S_UpdateSounds (players[consoleplayer].camera);	// move positional sounds
+		if (!Args->CheckParm("-dedicated"))
+		{
+			P_PredictPlayer(&players[consoleplayer]);
+			S_UpdateSounds (players[consoleplayer].camera);	// move positional sounds
+		}
 	}
 	else
 	{
@@ -3140,3 +3175,4 @@ CCMD (net_listcontrollers)
 		}
 	}
 }
+

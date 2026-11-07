@@ -1208,7 +1208,8 @@ void D_DoomLoop ()
 	Subtitle = nullptr;
 	Advisory.SetInvalid();
 
-	vid_cursor->Callback();
+	const bool dedicated = Args->CheckParm("-dedicated") != 0;
+	if (!dedicated) vid_cursor->Callback();
 
 	for (;;)
 	{
@@ -1220,12 +1221,17 @@ void D_DoomLoop ()
 			if (gametic > lasttic)
 			{
 				lasttic = gametic;
-				I_StartFrame ();
+				if (!dedicated) I_StartFrame ();
 			}
 			I_SetFrameTime();
 
 			// process one or more tics
-			if (singletics)
+			if (dedicated)
+			{
+				// Dedicated hosts always use the network tic scheduler.
+				TryRunTics ();
+			}
+			else if (singletics)
 			{
 				I_StartTic ();
 				D_ProcessEvents ();
@@ -1246,11 +1252,14 @@ void D_DoomLoop ()
 			{
 				TryRunTics (); // will run at least one tic
 			}
-			// Update display, next frame, with current state.
-			I_StartTic ();
-			D_ProcessEvents();
-			D_Display ();
-			S_UpdateMusic();
+			// Update display and process local input only in client mode.
+			if (!dedicated)
+			{
+				I_StartTic ();
+				D_ProcessEvents();
+				D_Display ();
+				S_UpdateMusic();
+			}
 			if (wantToRestart)
 			{
 				wantToRestart = false;
