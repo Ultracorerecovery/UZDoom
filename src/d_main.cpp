@@ -3216,7 +3216,8 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 
 	int max_progress = TexMan.GuesstimateNumTextures();
 	int per_shader_progress = 0;//screen->GetShaderCount()? (max_progress / 10 / screen->GetShaderCount()) : 0;
-	bool nostartscreen = batchrun || restart || Args->CheckParm("-join") || Args->CheckParm("-host") || Args->CheckParm("-norun");
+	bool dedicated = Args->CheckParm("-dedicated") != 0;
+	bool nostartscreen = dedicated || batchrun || restart || Args->CheckParm("-join") || Args->CheckParm("-host") || Args->CheckParm("-norun");
 
 	if (GameStartupInfo.Type == FStartupInfo::DefaultStartup)
 	{
@@ -3268,15 +3269,18 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 	TexMan.Init();
 	
 	if (!batchrun) Printf ("V_Init: allocate screen.\n");
-	if (!restart)
+	if (!dedicated)
 	{
-		screen->CompileNextShader();
-		if (StartScreen != nullptr) StartScreen->Render();
-	}
-	else
-	{
-		// Update screen palette when restarting
-		screen->UpdatePalette();
+		if (!restart)
+		{
+			screen->CompileNextShader();
+			if (StartScreen != nullptr) StartScreen->Render();
+		}
+		else
+		{
+			// Update screen palette when restarting
+			screen->UpdatePalette();
+		}
 	}
 
 	// Base systems have been inited; enable cvar callbacks
@@ -3290,7 +3294,13 @@ static int D_InitGame(const FIWADInfo* iwad_info, std::vector<std::string>& allw
 	}
 
 	if (!batchrun) Printf ("ST_Init: Init startup screen.\n");
-	if (!restart)
+	if (dedicated)
+	{
+		// Use the no-op base implementation: platform startup screens may
+		// initialize window-system resources even when no window is wanted.
+		StartWindow = new FStartupScreen(0);
+	}
+	else if (!restart)
 	{
 		StartWindow = FStartupScreen::CreateInstance (TexMan.GuesstimateNumTextures() + 5);
 	}

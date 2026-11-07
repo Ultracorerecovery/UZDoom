@@ -3242,9 +3242,13 @@ void MapLoader::LoadLevel(MapData *map, const char *lumpname, int position)
 
 	InitRenderInfo();				// create hardware independent renderer resources for the level. This must be done BEFORE the PolyObj Spawn!!!
 	Level->ClearDynamic3DFloorData();	// CreateVBO must be run on the plain 3D floor data.
-	CreateVBO(screen->mVertexData, Level->sectors);
-
-	screen->InitLightmap(Level->LMTextureSize, Level->LMTextureCount, Level->LMTextureData);
+	// VBOs and lightmaps are renderer-owned data and require a graphics backend.
+	// A dedicated server only needs the simulation-side level structures.
+	if (Args == nullptr || !Args->CheckParm("-dedicated"))
+	{
+		CreateVBO(screen->mVertexData, Level->sectors);
+		screen->InitLightmap(Level->LMTextureSize, Level->LMTextureCount, Level->LMTextureData);
+	}
 
 	for (auto &sec : Level->sectors)
 	{

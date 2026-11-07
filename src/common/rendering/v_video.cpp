@@ -374,6 +374,13 @@ void V_InitScreen()
 
 void V_Init2()
 {
+	// A dedicated server keeps the dummy framebuffer created by V_InitScreen().
+	// It must not initialize SDL or create a window / graphics context.
+	if (Args != nullptr && Args->CheckParm("-dedicated"))
+	{
+		return;
+	}
+
 	{
 		DFrameBuffer *s = screen;
 		screen = NULL;
